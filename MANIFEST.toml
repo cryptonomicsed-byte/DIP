@@ -1,0 +1,22 @@
+[manifest]
+repo       = "DIP"
+role       = "decentralized-interoperability-protocol"
+version    = "0.1.0"
+security   = "medium"
+port       = 7792
+
+[protocol]
+kind       = "interop-bridge"
+adapters   = ["nostr", "a2a", "mcp", "meshtastic", "libp2p", "freenet", "http"]
+
+[events]
+emits    = ["envelope.routed", "adapter.registered"]
+consumes = ["*"]
+
+[receipts]
+kind = "custom"
+arp  = true
+
+[dependencies]
+required  = []
+optional  = ["vantage", "omo-koda2", "vcp", "ucx"]
