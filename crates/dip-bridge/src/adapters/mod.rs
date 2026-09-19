@@ -8,6 +8,8 @@ pub mod mcp;
 pub mod meshtastic;
 pub mod libp2p;
 pub mod freenet;
+pub mod zima;
+pub mod world_query;
 
 use dip_types::{AdapterCapability, AdapterKind, AdapterManifest, AdapterStatus};
 

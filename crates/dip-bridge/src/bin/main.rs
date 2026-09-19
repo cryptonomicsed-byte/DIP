@@ -13,6 +13,24 @@ struct AppData {
 #[tokio::main]
 async fn main() {
     let registry = Arc::new(AdapterRegistry::new());
+
+    // Register built-in adapters whose env config is present.
+
+    // ZimaOS adapter — fail-open: only register when ZIMA_API_URL is set.
+    if std::env::var("ZIMA_API_URL").map(|s| !s.is_empty()).unwrap_or(false) {
+        let manifest = AdapterManifest {
+            adapter_id:   "zima".to_string(),
+            kind:         AdapterKind::Custom("zima".to_string()),
+            version:      "0.1.0".to_string(),
+            capabilities: vec![AdapterCapability::Send, AdapterCapability::Receive],
+            networks:     vec!["zima".to_string()],
+            status:       AdapterStatus::Active,
+            endpoint:     std::env::var("ZIMA_API_URL").ok(),
+        };
+        registry.register(manifest);
+        println!("DIP: ZimaOS adapter registered (ZIMA_API_URL set)");
+    }
+
     let router = AdapterRouter::new(registry.clone());
     let state = Arc::new(AppData { registry, router });
 
