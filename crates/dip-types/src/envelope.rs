@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use gix_types::{Gix1, GixKind, GixNamespace, RoutingHints};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -22,12 +23,28 @@ pub struct DipEnvelope {
     pub created_at:     DateTime<Utc>,
     /// Ed25519 signature over canonical_hash()
     pub signature:      String,
+
+    /// GIX1 canonical_id (hex) stamped at envelope creation.
+    /// `GixNamespace::Mycelium` — every DIP message is GIX-addressable.
+    #[serde(default)]
+    pub gix1_canonical_id: Option<String>,
 }
 
 impl DipEnvelope {
     pub fn new(kind: DipMessageKind, from: &str, to: &str, payload: DipMessage) -> Self {
+        let envelope_id = Uuid::new_v4().to_string();
+        let created_at  = Utc::now();
+        let created_at_ms = created_at.timestamp_millis() as u64;
+        let env = Gix1::new(
+            GixKind::Receipt,
+            GixNamespace::Mycelium,
+            envelope_id.as_bytes(),
+            None,
+            created_at_ms,
+            RoutingHints::default(),
+        );
         Self {
-            envelope_id: Uuid::new_v4().to_string(),
+            envelope_id,
             kind,
             from: from.to_string(),
             to: to.to_string(),
@@ -35,8 +52,9 @@ impl DipEnvelope {
             trace_id: None,
             reply_to: None,
             ttl_secs: Some(300),
-            created_at: Utc::now(),
+            created_at,
             signature: String::new(),
+            gix1_canonical_id: Some(hex::encode(env.canonical_id)),
         }
     }
 
@@ -141,3 +159,27 @@ pub struct DipRoute {
 }
 
 pub type AdapterKindStr = String;
+
+#[cfg(test)]
+mod gix_tests {
+    use super::*;
+
+    #[test]
+    fn new_envelope_has_gix1_canonical_id() {
+        let env = DipEnvelope::new(
+            DipMessageKind::Ping,
+            "nostr:npub1test",
+            "*",
+            DipMessage::Ping { nonce: "abc".into() },
+        );
+        let id = env.gix1_canonical_id.as_ref().expect("gix1_canonical_id must be set");
+        assert_eq!(id.len(), 64, "canonical_id should be 32-byte hex");
+    }
+
+    #[test]
+    fn two_envelopes_have_distinct_gix1_ids() {
+        let e1 = DipEnvelope::new(DipMessageKind::Ping, "a", "b", DipMessage::Ping { nonce: "1".into() });
+        let e2 = DipEnvelope::new(DipMessageKind::Ping, "a", "b", DipMessage::Ping { nonce: "2".into() });
+        assert_ne!(e1.gix1_canonical_id, e2.gix1_canonical_id);
+    }
+}

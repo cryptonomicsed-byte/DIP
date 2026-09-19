@@ -9,3 +9,5 @@ serde_json = { workspace = true }
 uuid       = { workspace = true }
 thiserror  = { workspace = true }
 chrono     = { workspace = true }
+hex        = { workspace = true }
+gix-types  = { path = "../../../GIX/crates/gix-types" }
