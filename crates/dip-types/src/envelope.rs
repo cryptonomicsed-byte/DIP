@@ -70,12 +70,21 @@ impl DipEnvelope {
     }
 }
 
+/// SHA-256 of `data`, lowercase hex.
+///
+/// This is a real cryptographic hash. It previously used
+/// `std::collections::hash_map::DefaultHasher` (SipHash-1-3, 64-bit,
+/// randomly seeded per process in some configurations) with a second
+/// `finish()` call padding the output to 128 bits — non-cryptographic,
+/// and therefore forgeable by anyone who wanted to make two distinct
+/// envelopes share a `canonical_hash`. Since `canonical_hash()` is the
+/// message that `signature` is defined over, envelope integrity was
+/// only as strong as SipHash.
 fn sha256_hex(data: &[u8]) -> String {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-    let mut h = DefaultHasher::new();
-    data.hash(&mut h);
-    format!("{:016x}{:016x}", h.finish(), h.finish().wrapping_mul(0xdeadbeef))
+    use sha2::{Digest, Sha256};
+    let mut h = Sha256::new();
+    h.update(data);
+    hex::encode(h.finalize())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -181,5 +190,30 @@ mod gix_tests {
         let e1 = DipEnvelope::new(DipMessageKind::Ping, "a", "b", DipMessage::Ping { nonce: "1".into() });
         let e2 = DipEnvelope::new(DipMessageKind::Ping, "a", "b", DipMessage::Ping { nonce: "2".into() });
         assert_ne!(e1.gix1_canonical_id, e2.gix1_canonical_id);
+    }
+
+    /// Known-answer test against FIPS 180-4. If this ever regresses to a
+    /// non-cryptographic hasher, envelope integrity silently weakens — that
+    /// is exactly the bug this test exists to prevent.
+    #[test]
+    fn sha256_hex_matches_fips_180_4_vectors() {
+        assert_eq!(
+            sha256_hex(b""),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    /// `canonical_hash()` must be 64 hex chars (32 bytes), not the 32-char
+    /// double-`finish()` output the DefaultHasher version produced.
+    #[test]
+    fn canonical_hash_is_32_bytes_of_hex() {
+        let env = DipEnvelope::new(DipMessageKind::Ping, "a", "b", DipMessage::Ping { nonce: "1".into() });
+        let h = env.canonical_hash();
+        assert_eq!(h.len(), 64, "expected 32-byte hex digest, got {:?}", h);
+        assert!(h.chars().all(|c| c.is_ascii_hexdigit()));
     }
 }
