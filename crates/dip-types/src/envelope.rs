@@ -58,6 +58,16 @@ impl DipEnvelope {
         }
     }
 
+    /// Sign this envelope's `canonical_hash()` with the provided key.
+    ///
+    /// After calling `sign`, `self.signature` holds a 128-char lowercase hex
+    /// Ed25519 signature.  The verifying key is stored separately by the
+    /// caller (e.g. in the agent's identity manifest).
+    pub fn sign(&mut self, key: &crate::signing::DipSigningKey) {
+        let hash = self.canonical_hash();
+        self.signature = key.sign_envelope_data(&hash);
+    }
+
     pub fn canonical_hash(&self) -> String {
         use std::collections::BTreeMap;
         let map: BTreeMap<&str, &str> = [
