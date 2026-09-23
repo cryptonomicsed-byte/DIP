@@ -26,6 +26,7 @@ pub enum AdapterKind {
     Freenet,
     Http,
     HomeAssistant,
+    WorldQuery,
     Custom(String),
 }
 

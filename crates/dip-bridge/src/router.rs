@@ -50,6 +50,10 @@ impl AdapterRouter {
                 return crate::adapters::freenet::send(&envelope).await
                     .map_err(|e| DipError::Network(e));
             }
+            AdapterKind::Custom(ref scheme) if scheme == "zima" => {
+                return crate::adapters::zima::send_envelope(&envelope).await
+                    .map_err(|e| DipError::Network(e));
+            }
             _ => {}
         }
 
@@ -83,6 +87,9 @@ impl AdapterRouter {
         if address.starts_with("free:")  { return AdapterKind::Freenet; }
         if address.starts_with("habitat:") || address.starts_with("ha:") {
             return AdapterKind::HomeAssistant;
+        }
+        if address.starts_with("zima:") {
+            return AdapterKind::Custom("zima".to_string());
         }
         AdapterKind::Http
     }
